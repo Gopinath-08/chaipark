@@ -358,9 +358,8 @@ app.post('/api/orders', (req, res) => {
       return sum + (menuItem ? menuItem.price * item.quantity : 0);
     }, 0);
 
-    const tax = subtotal * 0.1; // 10% tax
-    const deliveryFee = 30;
-    const total = subtotal + tax + deliveryFee;
+    const deliveryFee = subtotal > 500 ? 0 : 20; // Free delivery above ₹500, otherwise ₹20
+    const total = subtotal + deliveryFee;
 
     // Create order
     const newOrder = {
@@ -383,7 +382,6 @@ app.post('/api/orders', (req, res) => {
       }),
       pricing: {
         subtotal,
-        tax,
         deliveryFee,
         total,
       },

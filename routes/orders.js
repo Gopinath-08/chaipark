@@ -66,9 +66,8 @@ router.post('/', [
 
   // Calculate totals
   const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const tax = subtotal * 0.05; // 5% tax
-  const deliveryFee = subtotal > 500 ? 0 : 50; // Free delivery above ₹500
-  const total = subtotal + tax + deliveryFee;
+  const deliveryFee = subtotal > 500 ? 0 : 20; // Free delivery above ₹500, otherwise ₹20
+  const total = subtotal + deliveryFee;
 
   // Create order
   const order = new Order({
@@ -78,7 +77,6 @@ router.post('/', [
     deliveryInfo,
     pricing: {
       subtotal,
-      tax,
       deliveryFee,
       total
     },

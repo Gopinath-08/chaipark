@@ -216,7 +216,7 @@ orderSchema.methods.updateStatus = function(newStatus, notes = '') {
 // Method to calculate total
 orderSchema.methods.calculateTotal = function() {
   const subtotal = this.items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const total = subtotal + this.pricing.tax + this.pricing.deliveryFee - this.pricing.discount;
+  const total = subtotal + this.pricing.deliveryFee - this.pricing.discount;
   
   this.pricing.subtotal = subtotal;
   this.pricing.total = total;
