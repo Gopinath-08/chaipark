@@ -255,6 +255,61 @@ router.patch('/orders/:id/assign', [
   });
 }));
 
+// @route   PATCH /api/admin/orders/:id/status
+// @desc    Update order status (Admin/Staff)
+// @access  Private (Admin/Staff)
+router.patch('/orders/:id/status', [
+  authenticateToken,
+  requireStaff,
+  body('status').isIn(['pending', 'confirmed', 'preparing', 'ready', 'out-for-delivery', 'delivered', 'cancelled']),
+  body('notes').optional().isString()
+], asyncHandler(async (req, res) => {
+  console.log('🔧 Admin order status update route hit!', req.params.id, req.body);
+  
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      errors: errors.array()
+    });
+  }
+
+  const { status, notes } = req.body;
+  
+  const order = await Order.findById(req.params.id)
+    .populate('customer', 'name phone');
+
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+
+  // Update status
+  await order.updateStatus(status, notes);
+
+  // Emit real-time update
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admin').emit('order-status-updated', {
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      customer: order.customer.name
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Order status updated successfully',
+    data: {
+      status: order.status,
+      updatedAt: order.updatedAt
+    }
+  });
+}));
+
 // @route   GET /api/admin/users
 // @desc    Get all users
 // @access  Private (Admin)

@@ -103,9 +103,9 @@ app.set('io', io);
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
+app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
-app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
 
 // Health check endpoint
