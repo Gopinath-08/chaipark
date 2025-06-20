@@ -159,20 +159,16 @@ orderSchema.index({ createdAt: -1 });
 
 // Generate order number before saving
 orderSchema.pre('save', async function(next) {
-  if (this.isNew) {
+  if (!this.orderNumber) {
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
-    
-    // Get count of orders for today
     const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const todayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-    
     const orderCount = await this.constructor.countDocuments({
       createdAt: { $gte: todayStart, $lt: todayEnd }
     });
-    
     const sequence = (orderCount + 1).toString().padStart(3, '0');
     this.orderNumber = `CP${year}${month}${day}${sequence}`;
   }

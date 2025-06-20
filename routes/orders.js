@@ -88,6 +88,21 @@ router.post('/', [
     estimatedDeliveryTime: new Date(Date.now() + 45 * 60 * 1000) // 45 minutes from now
   });
 
+  // Generate order number before saving
+  if (!order.orderNumber) {
+    const date = new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    const orderCount = await Order.countDocuments({
+      createdAt: { $gte: todayStart, $lt: todayEnd }
+    });
+    const sequence = (orderCount + 1).toString().padStart(3, '0');
+    order.orderNumber = `CP${year}${month}${day}${sequence}`;
+  }
+
   await order.save();
 
   // Increment popularity for ordered items
