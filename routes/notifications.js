@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
 // Mock notification data (replace with actual database in production)
@@ -61,7 +61,7 @@ const createHistoryEntry = (notificationData, result) => {
 
 // Send instant notification
 router.post('/instant', [
-  auth,
+  authenticateToken,
   body('title').notEmpty().withMessage('Title is required'),
   body('message').notEmpty().withMessage('Message is required'),
   body('type').isIn(['general', 'order', 'promotion', 'announcement']).withMessage('Invalid notification type')
@@ -94,7 +94,7 @@ router.post('/instant', [
 
 // Send offer notification
 router.post('/offer', [
-  auth,
+  authenticateToken,
   body('title').notEmpty().withMessage('Offer title is required'),
   body('description').notEmpty().withMessage('Offer description is required'),
   body('discount').isNumeric().withMessage('Discount must be a number')
@@ -148,7 +148,7 @@ router.post('/offer', [
 });
 
 // Get notification history
-router.get('/history', auth, (req, res) => {
+router.get('/history', authenticateToken, (req, res) => {
   try {
     res.json(notificationHistory);
   } catch (error) {
@@ -158,7 +158,7 @@ router.get('/history', auth, (req, res) => {
 });
 
 // Get daily notification settings
-router.get('/daily-settings', auth, (req, res) => {
+router.get('/daily-settings', authenticateToken, (req, res) => {
   try {
     res.json(dailyNotificationSettings);
   } catch (error) {
@@ -169,7 +169,7 @@ router.get('/daily-settings', auth, (req, res) => {
 
 // Update daily notification settings
 router.put('/daily-settings', [
-  auth,
+  authenticateToken,
   body('settings').isArray().withMessage('Settings must be an array')
 ], async (req, res) => {
   try {
@@ -195,7 +195,7 @@ router.put('/daily-settings', [
 });
 
 // Delete notification from history
-router.delete('/:notificationId', auth, (req, res) => {
+router.delete('/:notificationId', authenticateToken, (req, res) => {
   try {
     const { notificationId } = req.params;
     notificationHistory = notificationHistory.filter(notif => notif.id !== notificationId);
@@ -211,7 +211,7 @@ router.delete('/:notificationId', auth, (req, res) => {
 });
 
 // Get notification analytics
-router.get('/analytics', auth, (req, res) => {
+router.get('/analytics', authenticateToken, (req, res) => {
   try {
     const totalSent = notificationHistory.length;
     const totalRecipients = notificationHistory.reduce((sum, notif) => sum + notif.recipientCount, 0);
@@ -238,7 +238,7 @@ router.get('/analytics', auth, (req, res) => {
 
 // Send test notification
 router.post('/test', [
-  auth,
+  authenticateToken,
   body('title').notEmpty().withMessage('Test title is required'),
   body('message').notEmpty().withMessage('Test message is required')
 ], async (req, res) => {
@@ -265,7 +265,7 @@ router.post('/test', [
 });
 
 // Get user groups for targeting
-router.get('/user-groups', auth, (req, res) => {
+router.get('/user-groups', authenticateToken, (req, res) => {
   try {
     const userGroups = [
       { id: 'all', name: 'All Users', count: 1250, description: 'All registered users' },
@@ -283,7 +283,7 @@ router.get('/user-groups', auth, (req, res) => {
 
 // Schedule notification for later
 router.post('/schedule', [
-  auth,
+  authenticateToken,
   body('title').notEmpty().withMessage('Title is required'),
   body('message').notEmpty().withMessage('Message is required'),
   body('scheduledTime').isISO8601().withMessage('Valid scheduled time is required')
@@ -315,7 +315,7 @@ router.post('/schedule', [
 });
 
 // Cancel scheduled notification
-router.delete('/scheduled/:notificationId', auth, (req, res) => {
+router.delete('/scheduled/:notificationId', authenticateToken, (req, res) => {
   try {
     const { notificationId } = req.params;
     scheduledNotifications = scheduledNotifications.filter(notif => notif.id !== notificationId);
@@ -331,7 +331,7 @@ router.delete('/scheduled/:notificationId', auth, (req, res) => {
 });
 
 // Get notification templates
-router.get('/templates', auth, (req, res) => {
+router.get('/templates', authenticateToken, (req, res) => {
   try {
     const defaultTemplates = [
       {
@@ -366,7 +366,7 @@ router.get('/templates', auth, (req, res) => {
 
 // Save notification template
 router.post('/templates', [
-  auth,
+  authenticateToken,
   body('name').notEmpty().withMessage('Template name is required'),
   body('title').notEmpty().withMessage('Template title is required'),
   body('message').notEmpty().withMessage('Template message is required')
