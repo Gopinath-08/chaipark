@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const { authenticateToken, requireStaff } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { sendOrderStatusNotification } = require('../utils/notificationHelper');
 
 const router = express.Router();
 
@@ -247,6 +248,14 @@ router.patch('/:id/status', [
 
   // Update status
   await order.updateStatus(status, notes);
+
+  // Send notification to customer
+  try {
+    await sendOrderStatusNotification(order, status);
+  } catch (error) {
+    console.error('Failed to send notification:', error);
+    // Don't fail the request if notification fails
+  }
 
   // Emit real-time update
   const io = req.app.get('io');
