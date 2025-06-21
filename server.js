@@ -80,21 +80,55 @@ app.use('/uploads', express.static('uploads'));
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
+  console.log('🔌 New client connected:', socket.id);
   
   // Join admin room for real-time updates
   socket.on('join-admin', () => {
     socket.join('admin');
-    console.log('Admin joined the room');
+    console.log('👨‍💼 Admin joined the room');
+  });
+
+  // Join user-specific room for targeted notifications
+  socket.on('join_user_room', (data) => {
+    const { userId } = data;
+    if (userId) {
+      socket.join(`user_${userId}`);
+      console.log(`👤 User ${userId} joined their room`);
+    }
   });
   
   // Handle order status updates
   socket.on('order-status-update', (data) => {
     socket.to('admin').emit('order-updated', data);
   });
+
+  // Handle notification received acknowledgment
+  socket.on('notification_received', (data) => {
+    console.log('📧 Notification received acknowledgment:', data);
+    // In production, update notification delivery status in database
+  });
+
+  // Handle notification read acknowledgment
+  socket.on('notification_read', (data) => {
+    console.log('📖 Notification read acknowledgment:', data);
+    // In production, update notification read status in database
+  });
+
+  // Handle ping for connection testing
+  socket.on('ping', (data) => {
+    console.log('🏓 Ping received from:', socket.id);
+    socket.emit('pong', { 
+      timestamp: new Date().toISOString(),
+      originalTimestamp: data.timestamp 
+    });
+  });
   
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  socket.on('disconnect', (reason) => {
+    console.log('❌ Client disconnected:', socket.id, 'Reason:', reason);
+  });
+
+  socket.on('error', (error) => {
+    console.error('❌ Socket error:', error);
   });
 });
 
@@ -152,4 +186,6 @@ server.listen(PORT, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-module.exports = { app, server, io }; 
+// Export io for access in routes
+module.exports = { app, server, io };
+module.exports.io = io; 

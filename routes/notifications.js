@@ -56,8 +56,8 @@ const sendToMobileUsers = async (notificationData, targetUsers = 'all') => {
       };
     }
 
-    // Send FCM notifications
-    const fcmResults = await sendFCMNotifications(targetTokens, notificationData);
+    // Send real-time notifications via WebSocket
+    const fcmResults = await sendRealTimeNotifications(targetTokens, notificationData);
     
     return {
       sent: true,
@@ -97,30 +97,35 @@ const getTargetFCMTokens = (targetUsers) => {
   }
 };
 
-// Send FCM notifications (mock implementation)
-const sendFCMNotifications = async (tokens, notificationData) => {
+// Send real-time notifications via WebSocket
+const sendRealTimeNotifications = async (tokens, notificationData) => {
   const { title, message, type } = notificationData;
   
-  console.log(`📤 Sending FCM notifications to ${tokens.length} devices...`);
+  console.log(`📤 Sending real-time notifications to ${tokens.length} devices...`);
   
-  // Mock FCM sending - in production, use Firebase Admin SDK
   const results = {
     successCount: 0,
     failedCount: 0,
     results: []
   };
 
+  // Get Socket.IO instance from app
+  const io = require('../server').io;
+  
   for (const tokenData of tokens) {
     try {
-      // Simulate FCM API call
-      const fcmPayload = {
-        to: tokenData.token,
-        notification: {
-          title,
-          body: message,
-          icon: 'ic_launcher',
-          sound: 'default',
-        },
+      // Create notification payload
+      const notificationPayload = {
+        id: Date.now().toString() + '_' + tokenData.userId,
+        title,
+        message,
+        type,
+        source: 'admin',
+        notificationType: type,
+        targetUsers: notificationData.targetUsers,
+        timestamp: new Date().toISOString(),
+        userId: tokenData.userId,
+        platform: tokenData.platform,
         data: {
           type,
           source: 'admin',
@@ -128,42 +133,31 @@ const sendFCMNotifications = async (tokens, notificationData) => {
           title,
           message,
           timestamp: new Date().toISOString(),
-        },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: getChannelIdForType(type),
-            priority: 'high',
-            defaultSound: true,
-            defaultVibrateTimings: true,
-          }
-        },
-        apns: {
-          payload: {
-            aps: {
-              alert: { title, body: message },
-              sound: 'default',
-              badge: 1,
-            }
-          }
         }
       };
 
-      // In production, replace with actual FCM API call:
-      // const response = await admin.messaging().send(fcmPayload);
+      // Send via WebSocket to specific user or broadcast to all
+      if (tokenData.userId && tokenData.userId !== 'anonymous') {
+        // Send to specific user room
+        io.to(`user_${tokenData.userId}`).emit('admin_notification', notificationPayload);
+        console.log(`✅ Real-time notification sent to user ${tokenData.userId} (${tokenData.platform})`);
+      } else {
+        // Broadcast to all connected clients
+        io.emit('admin_notification', notificationPayload);
+        console.log(`✅ Real-time notification broadcasted to all users (${tokenData.platform})`);
+      }
       
-      // Mock successful send
-      console.log(`✅ FCM notification sent to ${tokenData.platform} device (${tokenData.userId})`);
       results.successCount++;
       results.results.push({
         userId: tokenData.userId,
         platform: tokenData.platform,
         status: 'success',
-        timestamp: new Date()
+        timestamp: new Date(),
+        deliveryMethod: 'websocket'
       });
       
     } catch (error) {
-      console.error(`❌ Failed to send FCM notification to ${tokenData.userId}:`, error.message);
+      console.error(`❌ Failed to send real-time notification to ${tokenData.userId}:`, error.message);
       results.failedCount++;
       results.results.push({
         userId: tokenData.userId,
@@ -175,7 +169,7 @@ const sendFCMNotifications = async (tokens, notificationData) => {
     }
   }
 
-  console.log(`📊 FCM Results: ${results.successCount} sent, ${results.failedCount} failed`);
+  console.log(`📊 Real-time Results: ${results.successCount} sent, ${results.failedCount} failed`);
   return results;
 };
 
