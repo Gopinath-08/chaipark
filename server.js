@@ -19,6 +19,7 @@ const orderRoutes = require('./routes/orders');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const analyticsRoutes = require('./routes/analytics');
+const notificationRoutes = require('./routes/notifications');
 
 // Import middleware
 const { authenticateToken } = require('./middleware/auth');
@@ -104,6 +105,7 @@ app.set('io', io);
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
+app.use('/api/admin/notifications', authenticateToken, notificationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
