@@ -125,4 +125,111 @@ router.put('/:id', [
   });
 }));
 
+// Register/Update FCM token for push notifications
+router.post('/fcm-token', [
+  body('token').notEmpty().withMessage('FCM token is required'),
+  body('platform').isIn(['ios', 'android']).withMessage('Platform must be ios or android')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { token, platform, appVersion, deviceInfo } = req.body;
+    const userId = req.user?.id; // From auth middleware
+
+    // Store FCM token (in production, save to database)
+    const fcmTokenData = {
+      userId,
+      token,
+      platform,
+      appVersion,
+      deviceInfo,
+      registeredAt: new Date(),
+      isActive: true
+    };
+
+    // In production, save to database
+    // await FCMToken.findOneAndUpdate(
+    //   { userId, platform },
+    //   fcmTokenData,
+    //   { upsert: true, new: true }
+    // );
+
+    console.log('📱 FCM token registered:', {
+      userId: userId || 'anonymous',
+      platform,
+      token: token.substring(0, 20) + '...' // Log partial token for security
+    });
+
+    res.json({
+      success: true,
+      message: 'FCM token registered successfully',
+      data: {
+        platform,
+        registeredAt: fcmTokenData.registeredAt
+      }
+    });
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+    res.status(500).json({ message: 'Failed to register FCM token' });
+  }
+});
+
+// Get user notification preferences
+router.get('/notification-preferences', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    // In production, get from database
+    const defaultPreferences = {
+      general: true,
+      promotions: true,
+      orderUpdates: true,
+      dailyReminders: true,
+      sounds: true,
+      vibration: true
+    };
+
+    res.json({
+      success: true,
+      preferences: defaultPreferences
+    });
+  } catch (error) {
+    console.error('Error getting notification preferences:', error);
+    res.status(500).json({ message: 'Failed to get notification preferences' });
+  }
+});
+
+// Update user notification preferences
+router.put('/notification-preferences', [
+  body('general').optional().isBoolean(),
+  body('promotions').optional().isBoolean(),
+  body('orderUpdates').optional().isBoolean(),
+  body('dailyReminders').optional().isBoolean()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const userId = req.user?.id;
+    const preferences = req.body;
+
+    // In production, save to database
+    console.log('📱 Notification preferences updated:', { userId, preferences });
+
+    res.json({
+      success: true,
+      message: 'Notification preferences updated successfully',
+      preferences
+    });
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    res.status(500).json({ message: 'Failed to update notification preferences' });
+  }
+});
+
 module.exports = router; 

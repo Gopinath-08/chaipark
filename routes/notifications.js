@@ -14,23 +14,185 @@ let dailyNotificationSettings = [
 let scheduledNotifications = [];
 let notificationTemplates = [];
 
-// Helper function to simulate sending notifications to mobile app users
+// Mock FCM tokens storage (replace with database in production)
+let fcmTokens = [
+  // Example tokens for testing
+  { 
+    userId: 'test_user_1', 
+    token: 'mock_fcm_token_1', 
+    platform: 'android', 
+    isActive: true,
+    registeredAt: new Date()
+  },
+  { 
+    userId: 'test_user_2', 
+    token: 'mock_fcm_token_2', 
+    platform: 'ios', 
+    isActive: true,
+    registeredAt: new Date()
+  }
+];
+
+// Helper function to send FCM push notifications to mobile app users
 const sendToMobileUsers = async (notificationData, targetUsers = 'all') => {
-  // In production, this would integrate with FCM (Firebase Cloud Messaging)
-  // or your push notification service
   console.log('📱 Sending notification to mobile users:', {
     title: notificationData.title,
     message: notificationData.message,
     type: notificationData.type,
     targetUsers: targetUsers
   });
+
+  try {
+    // Get FCM tokens based on target users
+    const targetTokens = getTargetFCMTokens(targetUsers);
+    
+    if (targetTokens.length === 0) {
+      console.log('⚠️ No FCM tokens found for target users:', targetUsers);
+      return {
+        sent: true,
+        recipientCount: 0,
+        timestamp: new Date(),
+        details: 'No active tokens found'
+      };
+    }
+
+    // Send FCM notifications
+    const fcmResults = await sendFCMNotifications(targetTokens, notificationData);
+    
+    return {
+      sent: true,
+      recipientCount: fcmResults.successCount,
+      failedCount: fcmResults.failedCount,
+      timestamp: new Date(),
+      details: fcmResults
+    };
+  } catch (error) {
+    console.error('❌ Error sending notifications to mobile users:', error);
+    return {
+      sent: false,
+      recipientCount: 0,
+      timestamp: new Date(),
+      error: error.message
+    };
+  }
+};
+
+// Get FCM tokens based on target user criteria
+const getTargetFCMTokens = (targetUsers) => {
+  // In production, this would query your database
+  switch (targetUsers) {
+    case 'all':
+      return fcmTokens.filter(token => token.isActive);
+    case 'active':
+      // Users active in last 7 days
+      return fcmTokens.filter(token => token.isActive && token.userId.includes('active'));
+    case 'frequent':
+      // Users with 5+ orders
+      return fcmTokens.filter(token => token.isActive && token.userId.includes('frequent'));
+    case 'new':
+      // Users registered in last 30 days
+      return fcmTokens.filter(token => token.isActive && token.userId.includes('new'));
+    default:
+      return fcmTokens.filter(token => token.isActive);
+  }
+};
+
+// Send FCM notifications (mock implementation)
+const sendFCMNotifications = async (tokens, notificationData) => {
+  const { title, message, type } = notificationData;
   
-  // Simulate notification delivery
-  return {
-    sent: true,
-    recipientCount: getRecipientCount(targetUsers),
-    timestamp: new Date()
+  console.log(`📤 Sending FCM notifications to ${tokens.length} devices...`);
+  
+  // Mock FCM sending - in production, use Firebase Admin SDK
+  const results = {
+    successCount: 0,
+    failedCount: 0,
+    results: []
   };
+
+  for (const tokenData of tokens) {
+    try {
+      // Simulate FCM API call
+      const fcmPayload = {
+        to: tokenData.token,
+        notification: {
+          title,
+          body: message,
+          icon: 'ic_launcher',
+          sound: 'default',
+        },
+        data: {
+          type,
+          source: 'admin',
+          notificationType: type,
+          title,
+          message,
+          timestamp: new Date().toISOString(),
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: getChannelIdForType(type),
+            priority: 'high',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: { title, body: message },
+              sound: 'default',
+              badge: 1,
+            }
+          }
+        }
+      };
+
+      // In production, replace with actual FCM API call:
+      // const response = await admin.messaging().send(fcmPayload);
+      
+      // Mock successful send
+      console.log(`✅ FCM notification sent to ${tokenData.platform} device (${tokenData.userId})`);
+      results.successCount++;
+      results.results.push({
+        userId: tokenData.userId,
+        platform: tokenData.platform,
+        status: 'success',
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      console.error(`❌ Failed to send FCM notification to ${tokenData.userId}:`, error.message);
+      results.failedCount++;
+      results.results.push({
+        userId: tokenData.userId,
+        platform: tokenData.platform,
+        status: 'failed',
+        error: error.message,
+        timestamp: new Date()
+      });
+    }
+  }
+
+  console.log(`📊 FCM Results: ${results.successCount} sent, ${results.failedCount} failed`);
+  return results;
+};
+
+// Get notification channel ID for type
+const getChannelIdForType = (type) => {
+  switch (type) {
+    case 'order':
+    case 'order_status':
+      return 'order_updates';
+    case 'promotion':
+    case 'offer':
+      return 'promotions';
+    case 'general':
+    case 'announcement':
+    default:
+      return 'daily_reminders';
+  }
 };
 
 // Helper function to get recipient count based on target
@@ -393,6 +555,111 @@ router.post('/templates', [
   } catch (error) {
     console.error('Error saving template:', error);
     res.status(500).json({ message: 'Failed to save template' });
+  }
+});
+
+// Mark notification as read (for analytics)
+router.post('/read', [
+  authenticateToken,
+  body('notificationId').notEmpty().withMessage('Notification ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { notificationId } = req.body;
+    const userId = req.user?.id;
+    
+    // In production, save read status to database
+    console.log('📖 Notification marked as read:', {
+      notificationId,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ message: 'Failed to mark notification as read' });
+  }
+});
+
+// Store FCM token for notifications (called from mobile app)
+router.post('/fcm-token', [
+  body('token').notEmpty().withMessage('FCM token is required'),
+  body('platform').isIn(['ios', 'android']).withMessage('Platform must be ios or android')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { token, platform, appVersion, deviceInfo } = req.body;
+    const userId = req.user?.id || 'anonymous_' + Date.now();
+
+    // Add or update FCM token
+    const existingTokenIndex = fcmTokens.findIndex(t => t.userId === userId && t.platform === platform);
+    
+    const tokenData = {
+      userId,
+      token,
+      platform,
+      appVersion,
+      deviceInfo,
+      registeredAt: new Date(),
+      isActive: true
+    };
+
+    if (existingTokenIndex >= 0) {
+      fcmTokens[existingTokenIndex] = tokenData;
+      console.log('🔄 FCM token updated:', { userId, platform });
+    } else {
+      fcmTokens.push(tokenData);
+      console.log('➕ FCM token added:', { userId, platform });
+    }
+
+    res.json({
+      success: true,
+      message: 'FCM token registered successfully',
+      data: {
+        platform,
+        registeredAt: tokenData.registeredAt
+      }
+    });
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+    res.status(500).json({ message: 'Failed to register FCM token' });
+  }
+});
+
+// Get active FCM tokens (admin only)
+router.get('/fcm-tokens', authenticateToken, (req, res) => {
+  try {
+    const activeTokens = fcmTokens.filter(token => token.isActive);
+    
+    res.json({
+      success: true,
+      totalTokens: activeTokens.length,
+      platforms: {
+        android: activeTokens.filter(t => t.platform === 'android').length,
+        ios: activeTokens.filter(t => t.platform === 'ios').length
+      },
+      tokens: activeTokens.map(token => ({
+        userId: token.userId,
+        platform: token.platform,
+        registeredAt: token.registeredAt,
+        appVersion: token.appVersion
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching FCM tokens:', error);
+    res.status(500).json({ message: 'Failed to fetch FCM tokens' });
   }
 });
 
