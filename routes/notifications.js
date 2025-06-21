@@ -30,6 +30,21 @@ let fcmTokens = [
     platform: 'ios', 
     isActive: true,
     registeredAt: new Date()
+  },
+  // Add some anonymous/broadcast tokens that will catch all users
+  { 
+    userId: 'anonymous_broadcast', 
+    token: 'broadcast_token_1', 
+    platform: 'android', 
+    isActive: true,
+    registeredAt: new Date()
+  },
+  { 
+    userId: 'all_users', 
+    token: 'broadcast_token_2', 
+    platform: 'any', 
+    isActive: true,
+    registeredAt: new Date()
   }
 ];
 
@@ -112,40 +127,48 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
   // Get Socket.IO instance from app
   const io = require('../server').io;
   
+  if (!io) {
+    console.error('❌ Socket.IO not available');
+    return results;
+  }
+
+  // Create notification payload
+  const notificationPayload = {
+    id: Date.now().toString() + '_' + Math.random(),
+    title,
+    message,
+    type,
+    source: 'admin',
+    notificationType: type,
+    targetUsers: notificationData.targetUsers,
+    timestamp: new Date().toISOString(),
+    data: {
+      type,
+      source: 'admin',
+      notificationType: type,
+      title,
+      message,
+      timestamp: new Date().toISOString(),
+    }
+  };
+
+  // BROADCAST TO ALL CONNECTED CLIENTS (for immediate testing)
+  console.log('📡 Broadcasting notification to all connected clients...');
+  io.emit('admin_notification', notificationPayload);
+  
+  // Also try to send to specific user rooms
   for (const tokenData of tokens) {
     try {
-      // Create notification payload
-      const notificationPayload = {
-        id: Date.now().toString() + '_' + tokenData.userId,
-        title,
-        message,
-        type,
-        source: 'admin',
-        notificationType: type,
-        targetUsers: notificationData.targetUsers,
-        timestamp: new Date().toISOString(),
+      const userPayload = {
+        ...notificationPayload,
         userId: tokenData.userId,
         platform: tokenData.platform,
-        data: {
-          type,
-          source: 'admin',
-          notificationType: type,
-          title,
-          message,
-          timestamp: new Date().toISOString(),
-        }
       };
 
-      // Send via WebSocket to specific user or broadcast to all
-      if (tokenData.userId && tokenData.userId !== 'anonymous') {
-        // Send to specific user room
-        io.to(`user_${tokenData.userId}`).emit('admin_notification', notificationPayload);
-        console.log(`✅ Real-time notification sent to user ${tokenData.userId} (${tokenData.platform})`);
-      } else {
-        // Broadcast to all connected clients
-        io.emit('admin_notification', notificationPayload);
-        console.log(`✅ Real-time notification broadcasted to all users (${tokenData.platform})`);
-      }
+      // Send to specific user room
+      const room = `user_${tokenData.userId}`;
+      io.to(room).emit('admin_notification', userPayload);
+      console.log(`✅ Real-time notification sent to room: ${room} (${tokenData.platform})`);
       
       results.successCount++;
       results.results.push({
@@ -153,7 +176,8 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
         platform: tokenData.platform,
         status: 'success',
         timestamp: new Date(),
-        deliveryMethod: 'websocket'
+        deliveryMethod: 'websocket',
+        room: room
       });
       
     } catch (error) {
@@ -169,7 +193,11 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
     }
   }
 
+  // Log connected clients for debugging
+  const connectedClients = io.sockets.sockets.size;
+  console.log(`📊 Connected clients: ${connectedClients}`);
   console.log(`📊 Real-time Results: ${results.successCount} sent, ${results.failedCount} failed`);
+  
   return results;
 };
 
