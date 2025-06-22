@@ -85,7 +85,7 @@ io.on('connection', (socket) => {
   // Join admin room for real-time updates
   socket.on('join-admin', () => {
     socket.join('admin');
-    console.log('👨‍💼 Admin joined the room');
+    console.log('👨‍💼 Admin joined');
   });
 
   // Join user-specific room for targeted notifications
@@ -93,7 +93,7 @@ io.on('connection', (socket) => {
     const { userId } = data;
     if (userId) {
       socket.join(`user_${userId}`);
-      console.log(`👤 User ${userId} joined their room`);
+      console.log(`👤 User ${userId} joined room`);
     }
   });
   
@@ -102,21 +102,17 @@ io.on('connection', (socket) => {
     socket.to('admin').emit('order-updated', data);
   });
 
-  // Handle notification received acknowledgment
+  // Handle notification acknowledgments
   socket.on('notification_received', (data) => {
-    console.log('📧 Notification received acknowledgment:', data);
-    // In production, update notification delivery status in database
+    console.log('📧 Notification received');
   });
 
-  // Handle notification read acknowledgment
   socket.on('notification_read', (data) => {
-    console.log('📖 Notification read acknowledgment:', data);
-    // In production, update notification read status in database
+    console.log('📖 Notification read');
   });
 
   // Handle ping for connection testing
   socket.on('ping', (data) => {
-    console.log('🏓 Ping received from:', socket.id);
     socket.emit('pong', { 
       timestamp: new Date().toISOString(),
       originalTimestamp: data.timestamp 
@@ -124,7 +120,7 @@ io.on('connection', (socket) => {
   });
   
   socket.on('disconnect', (reason) => {
-    console.log('❌ Client disconnected:', socket.id, 'Reason:', reason);
+    console.log('❌ Client disconnected:', socket.id);
   });
 
   socket.on('error', (error) => {
@@ -184,6 +180,15 @@ const PORT = process.env.PORT || 4545;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Initialize daily notification scheduler
+  try {
+    const notificationHelper = require('./utils/notificationHelper');
+    const initResult = notificationHelper.initializeDailyNotificationScheduler();
+    console.log('📅 Daily notification scheduler status:', initResult);
+  } catch (error) {
+    console.error('❌ Failed to initialize daily notification scheduler:', error);
+  }
 });
 
 // Export io for access in routes

@@ -152,11 +152,11 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
     }
   };
 
-  // BROADCAST TO ALL CONNECTED CLIENTS (for immediate testing)
+  // BROADCAST TO ALL CONNECTED CLIENTS
   console.log('📡 Broadcasting notification to all connected clients...');
   io.emit('admin_notification', notificationPayload);
   
-  // Also try to send to specific user rooms
+  // Also send to specific user rooms
   for (const tokenData of tokens) {
     try {
       const userPayload = {
@@ -168,7 +168,6 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
       // Send to specific user room
       const room = `user_${tokenData.userId}`;
       io.to(room).emit('admin_notification', userPayload);
-      console.log(`✅ Real-time notification sent to room: ${room} (${tokenData.platform})`);
       
       results.successCount++;
       results.results.push({
@@ -181,7 +180,7 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
       });
       
     } catch (error) {
-      console.error(`❌ Failed to send real-time notification to ${tokenData.userId}:`, error.message);
+      console.error(`❌ Failed to send notification to ${tokenData.userId}:`, error.message);
       results.failedCount++;
       results.results.push({
         userId: tokenData.userId,
@@ -193,10 +192,9 @@ const sendRealTimeNotifications = async (tokens, notificationData) => {
     }
   }
 
-  // Log connected clients for debugging
+  // Log results
   const connectedClients = io.sockets.sockets.size;
-  console.log(`📊 Connected clients: ${connectedClients}`);
-  console.log(`📊 Real-time Results: ${results.successCount} sent, ${results.failedCount} failed`);
+  console.log(`✅ Notification sent to ${connectedClients} connected clients`);
   
   return results;
 };
@@ -365,12 +363,17 @@ router.put('/daily-settings', [
     const { settings } = req.body;
     dailyNotificationSettings = settings;
     
-    // In production, you would save this to database and update cron jobs
+    // Update the actual cron jobs with new settings
+    const notificationHelper = require('../utils/notificationHelper');
+    const scheduleResult = notificationHelper.updateDailyNotificationSchedule(settings);
+    
     console.log('📅 Daily notification settings updated:', settings);
+    console.log('⏰ Cron jobs updated:', scheduleResult);
     
     res.json({
       success: true,
-      message: 'Daily notification settings updated successfully'
+      message: 'Daily notification settings and schedule updated successfully',
+      scheduleInfo: scheduleResult
     });
   } catch (error) {
     console.error('Error updating daily notification settings:', error);
@@ -608,6 +611,48 @@ router.post('/read', [
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ message: 'Failed to mark notification as read' });
+  }
+});
+
+// Get daily notification scheduler status
+router.get('/scheduler-status', authenticateToken, (req, res) => {
+  try {
+    const notificationHelper = require('../utils/notificationHelper');
+    const status = notificationHelper.getNotificationScheduleStatus();
+    
+    res.json({
+      success: true,
+      ...status
+    });
+  } catch (error) {
+    console.error('Error fetching scheduler status:', error);
+    res.status(500).json({ message: 'Failed to fetch scheduler status' });
+  }
+});
+
+// Test daily notification
+router.post('/test-daily', [
+  authenticateToken,
+  body('notificationId').notEmpty().withMessage('Notification ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { notificationId } = req.body;
+    const notificationHelper = require('../utils/notificationHelper');
+    const result = await notificationHelper.testDailyNotification(notificationId);
+    
+    res.json({
+      success: result.success,
+      message: result.message,
+      recipientCount: result.recipientCount || 0
+    });
+  } catch (error) {
+    console.error('Error testing daily notification:', error);
+    res.status(500).json({ message: 'Failed to test daily notification' });
   }
 });
 
