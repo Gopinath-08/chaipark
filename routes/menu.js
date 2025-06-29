@@ -3,6 +3,8 @@ const { body, validationResult, query } = require('express-validator');
 const MenuItem = require('../models/MenuItem');
 const { authenticateToken, requireAdmin, requireStaff } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { uploadSingle, uploadSingleToCloudinary } = require('../middleware/upload');
+const { deleteFromCloudinary, extractPublicId } = require('../config/cloudinary');
 
 const router = express.Router();
 
@@ -132,6 +134,42 @@ router.get('/:id', asyncHandler(async (req, res) => {
   });
 }));
 
+// @route   POST /api/menu/upload-image
+// @desc    Upload image for menu item to Cloudinary
+// @access  Private (Admin/Staff)
+router.post('/upload-image', [
+  authenticateToken,
+  requireStaff,
+  uploadSingle,
+  uploadSingleToCloudinary
+], asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'No image file provided'
+    });
+  }
+
+  if (!req.cloudinaryResult) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload image to cloud storage'
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Image uploaded successfully to cloud storage',
+    data: {
+      imageUrl: req.cloudinaryResult.secure_url,
+      publicId: req.cloudinaryResult.public_id,
+      width: req.cloudinaryResult.width,
+      height: req.cloudinaryResult.height,
+      format: req.cloudinaryResult.format
+    }
+  });
+}));
+
 // @route   POST /api/menu
 // @desc    Create new menu item
 // @access  Private (Admin/Staff)
@@ -218,6 +256,20 @@ router.delete('/:id', [
       success: false,
       message: 'Menu item not found'
     });
+  }
+
+  // Delete associated image from Cloudinary if it exists
+  if (menuItem.image) {
+    try {
+      const publicId = extractPublicId(menuItem.image);
+      if (publicId) {
+        await deleteFromCloudinary(publicId);
+        console.log('Image deleted from Cloudinary:', publicId);
+      }
+    } catch (error) {
+      console.error('Failed to delete image from Cloudinary:', error);
+      // Don't fail the menu item deletion if image deletion fails
+    }
   }
 
   await MenuItem.findByIdAndDelete(req.params.id);
